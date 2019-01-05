@@ -13,7 +13,36 @@ const SALSA_ROUNDS: usize = 4;
 const PBKDF2_ROUNDS: usize = 1;
 const BLOCK_SIZE: usize = 64;
 
+use std::error::Error;
+use std::fmt;
+use std::fmt::Display;
+
 type Block = Vec<u8>;
+
+#[derive(Debug, PartialEq)]
+pub enum ScryptError {
+    RIsTooSmall,
+    NIsTooSmall,
+    NIsNotAPowerOfTwo,
+    PIsTooSmall,
+}
+
+impl Display for ScryptError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ScryptError: {}", self.description())
+    }
+}
+
+impl Error for ScryptError {
+    fn description(self: &ScryptError) -> &str {
+        match self {
+            ScryptError::RIsTooSmall => "`r` must be larger than 1",
+            ScryptError::NIsTooSmall => "`n` must be larger than 1",
+            ScryptError::NIsNotAPowerOfTwo => "`n` must be a power of two",
+            ScryptError::PIsTooSmall => "`p` must be larger than 1",
+        }
+    }
+}
 
 ///
 /// Main scrypt structure.
@@ -24,7 +53,7 @@ type Block = Vec<u8>;
 ///
 /// use::dumb_crypto::scrypt::Scrypt;
 ///
-/// let scrypt = Scrypt::new(1, 128, 1);
+/// let scrypt = Scrypt::new(1, 128, 1).unwrap();
 ///
 /// let mut out: [u8; 8] = [0; 8];
 ///
@@ -64,16 +93,31 @@ impl Scrypt {
     /// Create new instance of Scrypt.
     ///
     /// Arguments:
-    /// - `r` Block size parameter
+    /// - `r` Block size parameter, must be larger than 1
     /// - `n` CPU/Memory cost parameter, must be larger than 1,
-    ///       a power of 2 and less than 2^(128 * r / 8)
+    ///       a power of 2 and less than 2 ^ (16 * r)
     /// - `p` Parallelization parameter, a positive integer
-    ///       less than or equal to ((2^32-1) * hLen) / MFLen
+    ///       less than or equal to (2^32-1) / (4 * r)
     ///       where hLen is 32 and MFlen is 128 * r.
     ///
-    pub fn new(r: usize, n: usize, p: usize) -> Scrypt {
-        // TODO(indutny): errors!
-        Scrypt { r, n, p }
+    pub fn new(r: usize, n: usize, p: usize) -> Result<Scrypt, ScryptError> {
+        if r < 1 {
+            return Err(ScryptError::RIsTooSmall);
+        }
+
+        if n < 1 {
+            return Err(ScryptError::NIsTooSmall);
+        }
+
+        if ((n - 1) & n) != 0 {
+            return Err(ScryptError::NIsNotAPowerOfTwo);
+        }
+
+        if p < 1 {
+            return Err(ScryptError::PIsTooSmall);
+        }
+
+        Ok(Scrypt { r, n, p })
     }
 
     fn block_mix(self: &Scrypt, b: &[Block]) -> Vec<Block> {
@@ -256,7 +300,7 @@ mod tests {
     // https://tools.ietf.org/html/draft-josefsson-scrypt-kdf-03#page-8
 
     fn check_mix(r: usize, input: &[Block], expected: &[Block]) {
-        let s = Scrypt::new(r, 1, 1);
+        let s = Scrypt::new(r, 1, 1).unwrap();
         assert_eq!(s.block_mix(input), expected);
     }
 
@@ -300,7 +344,7 @@ mod tests {
     }
 
     fn check_ro_mix(r: usize, n: usize, input: &[Block], expected: &[Block]) {
-        let s = Scrypt::new(r, n, 1);
+        let s = Scrypt::new(r, n, 1).unwrap();
         assert_eq!(s.ro_mix(input.to_vec()), expected);
     }
 
@@ -348,7 +392,7 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec0() {
-        let s = Scrypt::new(1, 16, 1);
+        let s = Scrypt::new(1, 16, 1).unwrap();
 
         let mut out: [u8; 64] = [0; 64];
         s.derive(b"", b"", &mut out);
@@ -366,7 +410,7 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec1() {
-        let s = Scrypt::new(8, 1024, 16);
+        let s = Scrypt::new(8, 1024, 16).unwrap();
 
         let mut out: [u8; 64] = [0; 64];
         s.derive(b"password", b"NaCl", &mut out);
@@ -384,7 +428,7 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec2() {
-        let s = Scrypt::new(8, 16384, 1);
+        let s = Scrypt::new(8, 16384, 1).unwrap();
 
         let mut out: [u8; 64] = [0; 64];
         s.derive(b"pleaseletmein", b"SodiumChloride", &mut out);
@@ -402,7 +446,7 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec3() {
-        let s = Scrypt::new(8, 1_048_576, 1);
+        let s = Scrypt::new(8, 1_048_576, 1).unwrap();
 
         let mut out: [u8; 64] = [0; 64];
         s.derive(b"pleaseletmein", b"SodiumChloride", &mut out);
