@@ -127,6 +127,7 @@ impl Scrypt {
     ///       where hLen is 32 and MFlen is 128 * r.
     ///
     pub fn new(r: usize, n: usize, p: usize) -> Scrypt {
+        // TODO(indutny): errors!
         Scrypt { r, n, p }
     }
 
