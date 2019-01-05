@@ -119,9 +119,12 @@ impl Scrypt {
     /// Create new instance of Scrypt.
     ///
     /// Arguments:
-    /// - `r` - positive integer
-    /// - `n` - positive integer, MUST be a power of two
-    /// - `p` - positive integer
+    /// - `r` Block size parameter
+    /// - `n` CPU/Memory cost parameter, must be larger than 1,
+    ///       a power of 2 and less than 2^(128 * r / 8)
+    /// - `p` Parallelization parameter, a positive integer
+    ///       less than or equal to ((2^32-1) * hLen) / MFLen
+    ///       where hLen is 32 and MFlen is 128 * r.
     ///
     pub fn new(r: usize, n: usize, p: usize) -> Scrypt {
         Scrypt { r, n, p }
