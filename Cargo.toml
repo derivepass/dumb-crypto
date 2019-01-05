@@ -1,7 +1,16 @@
 [package]
-name = "derivepass"
-version = "0.1.0"
+name = "dumb-crypto"
+description = "Dumb, but easily verifiable implementations of crypto algorithms"
+version = "1.0.0"
 authors = ["Fedor Indutny <fedor@indutny.com>"]
+repository = "https://github.com/indutny/dumb-crypto"
+license = "MIT"
+keywords = ["dumb","crypto","sha256","hmac","pbkdf2","salsa20","scrypt"]
+readme = "README.md"
+exclude = [".travis.yml"]
 edition = "2018"
 
 [dependencies]
+
+[badges]
+travis-ci = { repository = "indutny/dumb-crypto" }

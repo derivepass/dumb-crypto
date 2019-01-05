@@ -49,14 +49,14 @@ impl HMac {
 
         block[..key.len()].copy_from_slice(key);
 
-        for i in 0..block.len() {
-            block[i] ^= 0x36;
+        for elem in block.iter_mut() {
+            *elem ^= 0x36;
         }
         inner.update(&block);
 
         /* NOTE: a ^ b ^ b ^ c = a ^ c */
-        for i in 0..block.len() {
-            block[i] ^= 0x36 ^ 0x5c;
+        for elem in block.iter_mut() {
+            *elem ^= 0x36 ^ 0x5c;
         }
         outer.update(&block);
 

@@ -1,4 +1,4 @@
 [[package]]
-name = "derivepass"
-version = "0.1.0"
+name = "dumb-crypto"
+version = "1.0.0"
 
