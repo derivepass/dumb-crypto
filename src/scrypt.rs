@@ -1,3 +1,11 @@
+//! # Salsa20
+//!
+//! Implementation of scrypt key derivation algorithm according to
+//! [RFC][rfc].
+//!
+//! [rfc]: https://tools.ietf.org/html/draft-josefsson-scrypt-kdf-03
+//!
+
 use crate::pbkdf2::pbkdf2_sha256;
 use crate::salsa20::{salsa20, BLOCK_SIZE as SALSA_BLOCK_SIZE};
 
@@ -7,6 +15,26 @@ const BLOCK_SIZE: usize = 64;
 
 type Block = Vec<u8>;
 
+///
+/// Main scrypt structure.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::scrypt::Scrypt;
+///
+/// let scrypt = Scrypt::new(1, 128, 1);
+///
+/// let mut out: [u8; 8] = [0; 8];
+///
+/// scrypt.derive(b"passphrase", b"salt", &mut out);
+///
+/// assert_eq!(out.to_vec(), vec![
+///     79, 35, 225, 99, 145, 145, 172, 245,
+/// ]);
+/// ```
+///
 pub struct Scrypt {
     r: usize,
     n: usize,
@@ -146,7 +174,7 @@ impl Scrypt {
         x
     }
 
-    pub fn digest(self: &Scrypt, passphrase: &[u8], salt: &[u8], out: &mut [u8]) {
+    pub fn derive(self: &Scrypt, passphrase: &[u8], salt: &[u8], out: &mut [u8]) {
         //
         //   Algorithm scrypt
         //
@@ -303,7 +331,7 @@ mod tests {
         let s = Scrypt::new(1, 16, 1);
 
         let mut out: [u8; 64] = [0; 64];
-        s.digest(b"", b"", &mut out);
+        s.derive(b"", b"", &mut out);
         assert_eq!(
             out.to_vec(),
             vec![
@@ -321,7 +349,7 @@ mod tests {
         let s = Scrypt::new(8, 1024, 16);
 
         let mut out: [u8; 64] = [0; 64];
-        s.digest(b"password", b"NaCl", &mut out);
+        s.derive(b"password", b"NaCl", &mut out);
         assert_eq!(
             out.to_vec(),
             vec![
@@ -339,7 +367,7 @@ mod tests {
         let s = Scrypt::new(8, 16384, 1);
 
         let mut out: [u8; 64] = [0; 64];
-        s.digest(b"pleaseletmein", b"SodiumChloride", &mut out);
+        s.derive(b"pleaseletmein", b"SodiumChloride", &mut out);
         assert_eq!(
             out.to_vec(),
             vec![
@@ -357,7 +385,7 @@ mod tests {
         let s = Scrypt::new(8, 1_048_576, 1);
 
         let mut out: [u8; 64] = [0; 64];
-        s.digest(b"pleaseletmein", b"SodiumChloride", &mut out);
+        s.derive(b"pleaseletmein", b"SodiumChloride", &mut out);
         assert_eq!(
             out.to_vec(),
             vec![

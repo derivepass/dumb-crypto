@@ -1,6 +1,6 @@
 //! # Salsa20
 //!
-//! Implementation of salsa20 algorithm to [the specification][spec].
+//! Implementation of salsa20 algorithm according to [the specification][spec].
 //!
 //! [spec]: http://cr.yp.to/snuffle/spec.pdf
 //!
