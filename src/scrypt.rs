@@ -45,61 +45,6 @@ fn block_xor(a: &[u8], b: &[u8]) -> Block {
     a.iter().zip(b.iter()).map(|(a, b)| a ^ b).collect()
 }
 
-fn block_mix(b: &[Block], r: usize) -> Vec<Block> {
-    //
-    // Algorithm scryptBlockMix
-    //
-    // Parameters:
-    //          r       Block size parameter.
-    //
-    // Input:
-    //          B[0], ..., B[2 * r - 1]
-    //                 Input vector of 2 * r 64-octet blocks.
-    //
-    // Output:
-    //          B'[0], ..., B'[2 * r - 1]
-    //                  Output vector of 2 * r 64-octet blocks.
-    //
-    // Steps:
-    //
-    //   1. X = B[2 * r - 1]
-    //
-    //   2. for i = 0 to 2 * r - 1 do
-    //        T = X xor B[i]
-    //        X = Salsa (T)
-    //        Y[i] = X
-    //      end for
-    //
-    //   3. B' = (Y[0], Y[2], ..., Y[2 * r - 2],
-    //            Y[1], Y[3], ..., Y[2 * r - 1])
-    //
-
-    // Step 1
-    let mut x = b[2 * r - 1].clone();
-
-    // Step 2
-    let mut y: Vec<Block> = Vec::with_capacity(2 * r);
-
-    for b_elem in b.iter() {
-        let t = block_xor(&x, b_elem);
-        salsa20(&t, SALSA_ROUNDS, &mut x);
-        y.push(x.clone());
-    }
-
-    // Step 3
-    let mut bs_head: Vec<Block> = Vec::with_capacity(2 * r);
-    let mut bs_tail: Vec<Block> = Vec::with_capacity(r);
-    for (i, y_elem) in y.into_iter().enumerate() {
-        if i % 2 == 0 {
-            bs_head.push(y_elem);
-        } else {
-            bs_tail.push(y_elem);
-        }
-    }
-    bs_head.append(&mut bs_tail);
-    bs_head
-}
-
 fn integerify(x: &[Block]) -> u64 {
     let last = &x[x.len() - 1];
     let tail = &last[(last.len() - SALSA_BLOCK_SIZE)..];
@@ -129,6 +74,61 @@ impl Scrypt {
     pub fn new(r: usize, n: usize, p: usize) -> Scrypt {
         // TODO(indutny): errors!
         Scrypt { r, n, p }
+    }
+
+    fn block_mix(self: &Scrypt, b: &[Block]) -> Vec<Block> {
+        //
+        // Algorithm scryptBlockMix
+        //
+        // Parameters:
+        //          r       Block size parameter.
+        //
+        // Input:
+        //          B[0], ..., B[2 * r - 1]
+        //                 Input vector of 2 * r 64-octet blocks.
+        //
+        // Output:
+        //          B'[0], ..., B'[2 * r - 1]
+        //                  Output vector of 2 * r 64-octet blocks.
+        //
+        // Steps:
+        //
+        //   1. X = B[2 * r - 1]
+        //
+        //   2. for i = 0 to 2 * r - 1 do
+        //        T = X xor B[i]
+        //        X = Salsa (T)
+        //        Y[i] = X
+        //      end for
+        //
+        //   3. B' = (Y[0], Y[2], ..., Y[2 * r - 2],
+        //            Y[1], Y[3], ..., Y[2 * r - 1])
+        //
+
+        // Step 1
+        let mut x = b[2 * self.r - 1].clone();
+
+        // Step 2
+        let mut y: Vec<Block> = Vec::with_capacity(2 * self.r);
+
+        for b_elem in b.iter() {
+            let t = block_xor(&x, b_elem);
+            salsa20(&t, SALSA_ROUNDS, &mut x);
+            y.push(x.clone());
+        }
+
+        // Step 3
+        let mut bs_head: Vec<Block> = Vec::with_capacity(2 * self.r);
+        let mut bs_tail: Vec<Block> = Vec::with_capacity(self.r);
+        for (i, y_elem) in y.into_iter().enumerate() {
+            if i % 2 == 0 {
+                bs_head.push(y_elem);
+            } else {
+                bs_tail.push(y_elem);
+            }
+        }
+        bs_head.append(&mut bs_tail);
+        bs_head
     }
 
     fn ro_mix(self: &Scrypt, b: Vec<Block>) -> Vec<Block> {
@@ -171,7 +171,7 @@ impl Scrypt {
         // Step 2
         let mut v: Vec<Vec<Block>> = Vec::with_capacity(self.n);
         for _i in 0..self.n {
-            let t = block_mix(&x, self.r);
+            let t = self.block_mix(&x);
             v.push(x);
             x = t;
         }
@@ -184,7 +184,7 @@ impl Scrypt {
                 .zip(v[j].iter())
                 .map(|(x_block, v_block)| block_xor(x_block, v_block))
                 .collect();
-            x = block_mix(&t, self.r);
+            x = self.block_mix(&t);
         }
 
         x
@@ -256,7 +256,8 @@ mod tests {
     // https://tools.ietf.org/html/draft-josefsson-scrypt-kdf-03#page-8
 
     fn check_mix(r: usize, input: &[Block], expected: &[Block]) {
-        assert_eq!(block_mix(input, r), expected);
+        let s = Scrypt::new(r, 1, 1);
+        assert_eq!(s.block_mix(input), expected);
     }
 
     #[test]
