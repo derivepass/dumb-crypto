@@ -10,11 +10,12 @@
 //! - scrypt
 //!
 //! Normally, one would find a highly optimized code implementing those.
-//! However, verifying such code is a non-trivial task. All routines (except for
-//! scrypt itself) are pre-requisites for scrypt, and a provided just for
-//! convenience.
+//! However, verifying such code is a non-trivial task.
 //!
-//! Documentation is provided for each separate module.
+//! All routines (except for scrypt itself) are pre-requisites for scrypt. They
+//! are provided here just for convenience.
+//!
+//! Documentation is available for each separate module.
 //!
 
 #[macro_use]
