@@ -1,4 +1,4 @@
-//! # Salsa20
+//! # Scrypt
 //!
 //! Implementation of scrypt key derivation algorithm according to
 //! [RFC][rfc].
