@@ -1,3 +1,11 @@
+//! # Salsa20
+//!
+//! Implementation of salsa20 algorithm to [the specification][spec].
+//!
+//! [spec]: http://cr.yp.to/snuffle/spec.pdf
+//!
+
+/// Algorithm block size
 pub const BLOCK_SIZE: usize = 64;
 
 // http://cr.yp.to/snuffle/spec.pdf
@@ -129,6 +137,30 @@ fn littleendian_inv(x: u32, y: &mut [u8]) {
     y[3] = (x >> 24) as u8;
 }
 
+///
+/// Mix `input` using `rounds` of internal transformations.
+///
+/// NOTE: `input` and `output` lengths must be multiples of `BLOCK_SIZE`
+/// NOTE: `output` MUST have the same size as `input`.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::salsa20::salsa20;
+///
+/// let mut out: [u8; 64] = [0; 64];
+///
+/// salsa20(&[7; 64], 100, &mut out);
+///
+/// assert_eq!(out.to_vec(), vec![
+///     121, 110, 7, 195, 60, 132, 20, 193, 62, 42, 49, 114, 249, 93, 87, 33,
+///     249, 93, 87, 33, 121, 110, 7, 195, 60, 132, 20, 193, 62, 42, 49, 114,
+///     62, 42, 49, 114, 249, 93, 87, 33, 121, 110, 7, 195, 60, 132, 20, 193,
+///     60, 132, 20, 193, 62, 42, 49, 114, 249, 93, 87, 33, 121, 110, 7, 195,
+/// ]);
+/// ```
+///
 pub fn salsa20(input: &[u8], rounds: usize, output: &mut [u8]) {
     //
     // In short: Salsa20(x) = x + doubleround^10(x), where each 4-byte sequence is

@@ -1,8 +1,34 @@
+//! # PBKDF2
+//!
+//! Implementation of PBKDF2 key derivation algorithm according to
+//! [RFC 2898][rfc].
+//!
+//! [rfc]: https://tools.ietf.org/html/rfc2898#section-5.2
+//!
+
 use crate::hmac::HMac;
 use crate::sha256::DIGEST_SIZE;
 
 // See: https://tools.ietf.org/html/rfc2898#section-5.2
 
+///
+/// Derive key using `password`, `salt`, and `c` rounds.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::pbkdf2::pbkdf2_sha256;
+///
+/// let mut out: [u8; 8] = [0; 8];
+///
+/// pbkdf2_sha256(b"password", b"salt", 100, &mut out);
+///
+/// assert_eq!(out.to_vec(), vec![
+///      0x07, 0xe6, 0x99, 0x71, 0x80, 0xcf, 0x7f, 0x12,
+/// ]);
+/// ```
+///
 pub fn pbkdf2_sha256(password: &[u8], salt: &[u8], c: usize, out: &mut [u8]) {
     //
     // Terminology:
