@@ -1,4 +1,13 @@
+//! # SHA256
+//!
+//! Implementation of SHA256 digest according to [RFC 6234][rfc
+//! [rfc]: https://tools.ietf.org/html/rfc6234#section-5.1
+//!
+
+/// Length of digest array
 pub const DIGEST_SIZE: usize = 32;
+
+/// Internal block size
 pub const BLOCK_SIZE: usize = 64;
 
 // See: https://tools.ietf.org/html/rfc6234#section-5.1
@@ -136,6 +145,26 @@ fn write_u64_be(data: &mut [u8], value: u64) {
     data[7] = (value) as u8;
 }
 
+///
+/// Main digest structure.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::sha256::SHA256;
+///
+/// let mut sha256 = SHA256::new();
+///
+/// sha256.update(b"hello world");
+/// assert_eq!(sha256.digest().to_vec(), vec![
+///     0xb9, 0x4d, 0x27, 0xb9, 0x93, 0x4d, 0x3e, 0x08,
+///     0xa5, 0x2e, 0x52, 0xd7, 0xda, 0x7d, 0xab, 0xfa,
+///     0xc4, 0x84, 0xef, 0xe3, 0x7a, 0x53, 0x80, 0xee,
+///     0x90, 0x88, 0xf7, 0xac, 0xe2, 0xef, 0xcd, 0xe9,
+/// ]);
+/// ```
+///
 pub struct SHA256 {
     h: [u32; 8],
     buffer: [u8; BLOCK_SIZE],
@@ -143,6 +172,9 @@ pub struct SHA256 {
 }
 
 impl SHA256 {
+    ///
+    /// Create new instance of SHA256 digest.
+    ///
     pub fn new() -> SHA256 {
         SHA256 {
             h: H,
@@ -243,6 +275,9 @@ impl SHA256 {
         self.h[7] = wrapping_sum!(self.h[7], h);
     }
 
+    ///
+    /// Add input `data` to the digest.
+    ///
     pub fn update(self: &mut SHA256, data: &[u8]) {
         let mut block: [u32; BLOCK_SIZE / 4] = [0; BLOCK_SIZE / 4];
 
@@ -262,6 +297,9 @@ impl SHA256 {
         }
     }
 
+    ///
+    /// Generate digest array.
+    ///
     pub fn digest(self: &mut SHA256) -> [u8; DIGEST_SIZE] {
         // https://tools.ietf.org/html/rfc6234#section-4.1
 
