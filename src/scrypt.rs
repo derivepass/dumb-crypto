@@ -171,8 +171,9 @@ impl Scrypt {
         // Step 2
         let mut v: Vec<Vec<Block>> = Vec::with_capacity(self.n);
         for _i in 0..self.n {
-            v.push(x.clone());
-            x = block_mix(&x, self.r);
+            let t = block_mix(&x, self.r);
+            v.push(x);
+            x = t;
         }
 
         // Step 3
