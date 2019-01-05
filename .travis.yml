@@ -6,7 +6,7 @@ rust:
 before_script:
   - rustup component add clippy rustfmt
 script:
-  - cargo clippy --all-targets --all-features
+  - cargo clippy --all-targets --all-features -- -D warnings
   - cargo fmt --all -- --check
   - cargo build
   - cargo test
