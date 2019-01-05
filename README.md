@@ -34,7 +34,7 @@ let mut out: [u8; 8] = [0; 8];
 scrypt.derive(b"passphrase", b"salt", &mut out);
 
 assert_eq!(out.to_vec(), vec![
-79, 35, 225, 99, 145, 145, 172, 245,
+    79, 35, 225, 99, 145, 145, 172, 245,
 ]);
 ```
 
