@@ -53,11 +53,11 @@ impl Error for ScryptError {
 ///
 /// use::dumb_crypto::scrypt::Scrypt;
 ///
-/// let scrypt = Scrypt::new(1, 128, 1).unwrap();
+/// let scrypt = Scrypt::new(1, 128, 1);
 ///
 /// let mut out: [u8; 8] = [0; 8];
 ///
-/// scrypt.derive(b"passphrase", b"salt", &mut out);
+/// scrypt.derive(b"passphrase", b"salt", &mut out).unwrap();
 ///
 /// assert_eq!(out.to_vec(), vec![
 ///     79, 35, 225, 99, 145, 145, 172, 245,
@@ -100,25 +100,8 @@ impl Scrypt {
     ///       less than or equal to (2^32-1) / (4 * r)
     ///       where hLen is 32 and MFlen is 128 * r.
     ///
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new(r: usize, n: usize, p: usize) -> Result<Scrypt, ScryptError> {
-        if r < 1 {
-            return Err(ScryptError::RIsTooSmall);
-        }
-
-        if n < 1 {
-            return Err(ScryptError::NIsTooSmall);
-        }
-
-        if ((n - 1) & n) != 0 {
-            return Err(ScryptError::NIsNotAPowerOfTwo);
-        }
-
-        if p < 1 {
-            return Err(ScryptError::PIsTooSmall);
-        }
-
-        Ok(Self { r, n, p })
+    pub fn new(r: usize, n: usize, p: usize) -> Self {
+        Self { r, n, p }
     }
 
     fn block_mix(self: &Scrypt, b: &[Block]) -> Vec<Block> {
@@ -238,7 +221,28 @@ impl Scrypt {
     ///
     /// Derive secret string using `passphrase` and `salt`.
     ///
-    pub fn derive(self: &Scrypt, passphrase: &[u8], salt: &[u8], out: &mut [u8]) {
+    pub fn derive(
+        self: &Scrypt,
+        passphrase: &[u8],
+        salt: &[u8],
+        out: &mut [u8],
+    ) -> Result<(), ScryptError> {
+        if self.r < 1 {
+            return Err(ScryptError::RIsTooSmall);
+        }
+
+        if self.n < 1 {
+            return Err(ScryptError::NIsTooSmall);
+        }
+
+        if ((self.n - 1) & self.n) != 0 {
+            return Err(ScryptError::NIsNotAPowerOfTwo);
+        }
+
+        if self.p < 1 {
+            return Err(ScryptError::PIsTooSmall);
+        }
+
         //
         //   Algorithm scrypt
         //
@@ -291,6 +295,8 @@ impl Scrypt {
         // Step 3
         let b_salt: Vec<u8> = b.into_iter().flatten().flatten().collect();
         pbkdf2_sha256(passphrase, &b_salt, PBKDF2_ROUNDS, out);
+
+        Ok(())
     }
 }
 
@@ -301,7 +307,7 @@ mod tests {
     // https://tools.ietf.org/html/draft-josefsson-scrypt-kdf-03#page-8
 
     fn check_mix(r: usize, input: &[Block], expected: &[Block]) {
-        let s = Scrypt::new(r, 1, 1).unwrap();
+        let s = Scrypt::new(r, 1, 1);
         assert_eq!(s.block_mix(input), expected);
     }
 
@@ -345,7 +351,7 @@ mod tests {
     }
 
     fn check_ro_mix(r: usize, n: usize, input: &[Block], expected: &[Block]) {
-        let s = Scrypt::new(r, n, 1).unwrap();
+        let s = Scrypt::new(r, n, 1);
         assert_eq!(s.ro_mix(input.to_vec()), expected);
     }
 
@@ -393,10 +399,10 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec0() {
-        let s = Scrypt::new(1, 16, 1).unwrap();
+        let s = Scrypt::new(1, 16, 1);
 
         let mut out: [u8; 64] = [0; 64];
-        s.derive(b"", b"", &mut out);
+        s.derive(b"", b"", &mut out).unwrap();
         assert_eq!(
             out.to_vec(),
             vec![
@@ -411,10 +417,10 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec1() {
-        let s = Scrypt::new(8, 1024, 16).unwrap();
+        let s = Scrypt::new(8, 1024, 16);
 
         let mut out: [u8; 64] = [0; 64];
-        s.derive(b"password", b"NaCl", &mut out);
+        s.derive(b"password", b"NaCl", &mut out).unwrap();
         assert_eq!(
             out.to_vec(),
             vec![
@@ -429,10 +435,11 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec2() {
-        let s = Scrypt::new(8, 16384, 1).unwrap();
+        let s = Scrypt::new(8, 16384, 1);
 
         let mut out: [u8; 64] = [0; 64];
-        s.derive(b"pleaseletmein", b"SodiumChloride", &mut out);
+        s.derive(b"pleaseletmein", b"SodiumChloride", &mut out)
+            .unwrap();
         assert_eq!(
             out.to_vec(),
             vec![
@@ -447,10 +454,11 @@ mod tests {
 
     #[test]
     fn it_should_compute_scrypt_for_vec3() {
-        let s = Scrypt::new(8, 1_048_576, 1).unwrap();
+        let s = Scrypt::new(8, 1_048_576, 1);
 
         let mut out: [u8; 64] = [0; 64];
-        s.derive(b"pleaseletmein", b"SodiumChloride", &mut out);
+        s.derive(b"pleaseletmein", b"SodiumChloride", &mut out)
+            .unwrap();
         assert_eq!(
             out.to_vec(),
             vec![
