@@ -437,7 +437,9 @@ mod tests {
     fn it_should_compute_digest_for_doubled_long_str() {
         check(
             &[
-                "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopqabcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"],
+                "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopqabc\
+                 dbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+            ],
             [
                 0x59, 0xf1, 0x09, 0xd9, 0x53, 0x3b, 0x2b, 0x70, 0xe7, 0xc3, 0xb8, 0x14, 0xa2, 0xbd,
                 0x21, 0x8f, 0x78, 0xea, 0x5d, 0x37, 0x14, 0x45, 0x5b, 0xc6, 0x79, 0x87, 0xcf, 0x0d,
