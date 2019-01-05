@@ -87,14 +87,17 @@ fn block_mix(b: &[Block], r: usize) -> Vec<Block> {
     }
 
     // Step 3
-    let mut bs: Vec<Block> = Vec::with_capacity(2 * r);
-    for i in 0..r {
-        bs.push(y[i * 2].clone());
+    let mut bs_head: Vec<Block> = Vec::with_capacity(2 * r);
+    let mut bs_tail: Vec<Block> = Vec::with_capacity(r);
+    for (i, y_elem) in y.into_iter().enumerate() {
+        if i % 2 == 0 {
+            bs_head.push(y_elem);
+        } else {
+            bs_tail.push(y_elem);
+        }
     }
-    for i in 0..r {
-        bs.push(y[i * 2 + 1].clone());
-    }
-    bs
+    bs_head.append(&mut bs_tail);
+    bs_head
 }
 
 fn integerify(x: &[Block]) -> u64 {
@@ -112,6 +115,14 @@ fn integerify(x: &[Block]) -> u64 {
 }
 
 impl Scrypt {
+    ///
+    /// Create new instance of Scrypt.
+    ///
+    /// Arguments:
+    /// - `r` - positive integer
+    /// - `n` - positive integer, MUST be a power of two
+    /// - `p` - positive integer
+    ///
     pub fn new(r: usize, n: usize, p: usize) -> Scrypt {
         Scrypt { r, n, p }
     }
@@ -174,6 +185,9 @@ impl Scrypt {
         x
     }
 
+    ///
+    /// Derive secret string using `passphrase` and `salt`.
+    ///
     pub fn derive(self: &Scrypt, passphrase: &[u8], salt: &[u8], out: &mut [u8]) {
         //
         //   Algorithm scrypt
