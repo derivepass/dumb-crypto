@@ -1,7 +1,7 @@
 [package]
 name = "dumb-crypto"
 description = "Dumb, but easily verifiable implementations of crypto algorithms"
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Fedor Indutny <fedor@indutny.com>"]
 repository = "https://github.com/indutny/dumb-crypto"
 license = "MIT"
