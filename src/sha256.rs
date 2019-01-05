@@ -1,6 +1,7 @@
 //! # SHA256
 //!
-//! Implementation of SHA256 digest according to [RFC 6234][rfc
+//! Implementation of SHA256 digest according to [RFC 6234][rfc]
+//!
 //! [rfc]: https://tools.ietf.org/html/rfc6234#section-5.1
 //!
 

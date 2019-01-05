@@ -1,5 +1,33 @@
+//! # Hmac
+//!
+//! Implementation of HMac SHA256 message authentication algorithm according to
+//! [RFC 2104][rfc].
+//!
+//! [rfc]: https://tools.ietf.org/html/rfc2104#section-2
+//!
+
 use crate::sha256::{BLOCK_SIZE, DIGEST_SIZE, SHA256};
 
+///
+/// Main hmac-sha256 structure.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::hmac::HMac;
+///
+/// let mut hmac = HMac::new(b"secret key");
+///
+/// hmac.update(b"hello world");
+/// assert_eq!(hmac.digest().to_vec(), vec![
+///     0xc6, 0x1b, 0x51, 0x98, 0xdf, 0x58, 0x63, 0x9e,
+///     0xdb, 0x98, 0x92, 0x51, 0x47, 0x56, 0xb8, 0x9a,
+///     0x36, 0x85, 0x6d, 0x82, 0x6e, 0x5d, 0x85, 0x02,
+///     0x3a, 0xb1, 0x81, 0xb4, 0x8e, 0xa5, 0xd0, 0x18,
+/// ]);
+/// ```
+///
 pub struct HMac {
     inner: SHA256,
     outer: SHA256,
@@ -8,6 +36,13 @@ pub struct HMac {
 // See https://tools.ietf.org/html/rfc2104#section-2
 
 impl HMac {
+    ///
+    /// Create new instance of Hmac-sha256 message authentication.
+    ///
+    /// Arguments:
+    ///
+    /// - `key` - secret key
+    ///
     pub fn new(key: &[u8]) -> HMac {
         //
         //                ipad = the byte 0x36 repeated B times
@@ -63,10 +98,16 @@ impl HMac {
         HMac { inner, outer }
     }
 
+    ///
+    /// Add input `data` to the digest.
+    ///
     pub fn update(self: &mut HMac, data: &[u8]) {
         self.inner.update(data);
     }
 
+    ///
+    /// Generate digest array.
+    ///
     pub fn digest(self: &mut HMac) -> [u8; DIGEST_SIZE] {
         self.outer.update(&self.inner.digest());
         self.outer.digest()
