@@ -100,6 +100,7 @@ impl Scrypt {
     ///       less than or equal to (2^32-1) / (4 * r)
     ///       where hLen is 32 and MFlen is 128 * r.
     ///
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(r: usize, n: usize, p: usize) -> Result<Scrypt, ScryptError> {
         if r < 1 {
             return Err(ScryptError::RIsTooSmall);
@@ -117,7 +118,7 @@ impl Scrypt {
             return Err(ScryptError::PIsTooSmall);
         }
 
-        Ok(Scrypt { r, n, p })
+        Ok(Self { r, n, p })
     }
 
     fn block_mix(self: &Scrypt, b: &[Block]) -> Vec<Block> {
