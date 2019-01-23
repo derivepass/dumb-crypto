@@ -6,6 +6,11 @@
 //! [fips]: https://csrc.nist.gov/csrc/media/publications/fips/197/final/documents/fips-197.pdf
 //!
 
+pub const BLOCK_SIZE: usize = 16;
+
+// Note: block[column][row]
+type Block = [[u8; 4]; 4];
+
 const SBOX: [u8; 256] = [
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -44,10 +49,21 @@ const INV_SBOX: [u8; 256] = [
     0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7,
 ];
 
-// Note: block[column][row]
-type Block = [[u8; 4]; 4];
-
-pub struct AES {}
+// Rcon[i], contains the values given by [ x^(i - 1), 0, 0, 0 ], with x^(i - 1)
+// being powers of x (x denoted as {02}) in the field GF(2^8). (note that i
+// starts at 1, not 0)
+const RCON: [u32; 10] = [
+    0x0100_0000,
+    0x0200_0000,
+    0x0400_0000,
+    0x0800_0000,
+    0x1000_0000,
+    0x2000_0000,
+    0x4000_0000,
+    0x8000_0000,
+    0x1b00_0000,
+    0x3600_0000,
+];
 
 // Double the number in the binary field.
 fn double(b: u8) -> u8 {
@@ -73,83 +89,226 @@ fn mul(b: u8, mut by: u8) -> u8 {
     res
 }
 
-fn sub_bytes(s: &mut Block) {
-    for col in s.iter_mut() {
-        for cell in col.iter_mut() {
-            *cell = SBOX[usize::from(*cell)];
-        }
+fn sub_word(b: u32) -> u32 {
+    let b0 = (b >> 24) as usize;
+    let b1 = ((b >> 16) & 0xff) as usize;
+    let b2 = ((b >> 8) & 0xff) as usize;
+    let b3 = (b & 0xff) as usize;
+
+    (u32::from(SBOX[b0]) << 24)
+        | (u32::from(SBOX[b1]) << 16)
+        | (u32::from(SBOX[b2]) << 8)
+        | u32::from(SBOX[b3])
+}
+
+fn rot_word(b: u32) -> u32 {
+    (b << 8) | (b >> 24)
+}
+
+// TODO(indutny): proper errors
+fn compute_round_count(key: &[u8]) -> Result<usize, ()> {
+    match key.len() {
+        // 128 bits
+        16 => Ok(10),
+
+        // 192 bits
+        24 => Ok(12),
+
+        // 256 bits
+        32 => Ok(14),
+
+        _ => Err(()),
     }
 }
 
-fn inv_sub_bytes(s: &mut Block) {
-    for col in s.iter_mut() {
-        for cell in col.iter_mut() {
-            *cell = INV_SBOX[usize::from(*cell)];
+fn expand_key(key: &[u8], round_count: usize) -> Vec<u32> {
+    let nb = BLOCK_SIZE / 4;
+
+    // byte key[4*Nk]
+    let nk = key.len() / 4;
+
+    // word w[Nb*(Nr+1)]
+    let mut w = Vec::with_capacity(nb * (round_count + 1));
+
+    //  word  temp
+    //  i = 0
+    //  while (i < Nk)
+    //      w[i] = word(key[4*i], key[4*i+1], key[4*i+2], key[4*i+3])
+    //      i = i+1
+    //  end while
+
+    let mut i: usize = 0;
+    while i < nk {
+        w.push(
+            (u32::from(key[4 * i]) << 24)
+                | (u32::from(key[4 * i + 1]) << 16)
+                | (u32::from(key[4 * i + 2]) << 8)
+                | u32::from(key[4 * i + 3]),
+        );
+        i += 1;
+    }
+
+    //  i = Nk
+    //  while (i < Nb * (Nr+1)]
+    //      temp = w[i-1]
+    //      if (i mod Nk = 0)
+    //          temp = SubWord(RotWord(temp)) xor Rcon[i/Nk]
+    //      else if (Nk > 6 and i mod Nk = 4)
+    //          temp = SubWord(temp)
+    //      end if
+    //      w[i] = w[i-Nk] xor temp
+    //      i = i + 1
+    //  end while
+    while i < nb * (round_count + 1) {
+        let mut temp = w[i - 1];
+        if i % nk == 0 {
+            temp = sub_word(rot_word(temp)) ^ RCON[i / nk - 1];
+        } else if nk > 6 && i % nk == 4 {
+            temp = sub_word(temp);
         }
+        w.push(w[i - nk] ^ temp);
+        i += 1;
+    }
+
+    w
+}
+
+trait AES {
+    fn lookup_sbox(b: u8) -> u8;
+    fn mix_column(col: [u8; 4]) -> [u8; 4];
+    fn shift_rows(s: &Block) -> Block;
+
+    // Common methods
+
+    fn sub_bytes(s: &mut Block) {
+        for col in s.iter_mut() {
+            for cell in col.iter_mut() {
+                *cell = Self::lookup_sbox(*cell);
+            }
+        }
+    }
+
+    fn mix_columns(s: &Block) -> Block {
+        [
+            Self::mix_column(s[0]),
+            Self::mix_column(s[1]),
+            Self::mix_column(s[2]),
+            Self::mix_column(s[3]),
+        ]
     }
 }
 
-fn shift_rows(s: &Block) -> Block {
-    [
-        [s[0][0], s[1][1], s[2][2], s[3][3]],
-        [s[1][0], s[2][1], s[3][2], s[0][3]],
-        [s[2][0], s[3][1], s[0][2], s[1][3]],
-        [s[3][0], s[0][1], s[1][2], s[2][3]],
-    ]
+struct AESEncrypt {}
+struct AESDecrypt {}
+
+impl AES for AESEncrypt {
+    fn lookup_sbox(b: u8) -> u8 {
+        SBOX[usize::from(b)]
+    }
+
+    fn mix_column(col: [u8; 4]) -> [u8; 4] {
+        [
+            mul(col[0], 2) ^ mul(col[1], 3) ^ col[2] ^ col[3],
+            mul(col[1], 2) ^ mul(col[2], 3) ^ col[3] ^ col[0],
+            mul(col[2], 2) ^ mul(col[3], 3) ^ col[0] ^ col[1],
+            mul(col[3], 2) ^ mul(col[0], 3) ^ col[1] ^ col[2],
+        ]
+    }
+
+    fn shift_rows(s: &Block) -> Block {
+        [
+            [s[0][0], s[1][1], s[2][2], s[3][3]],
+            [s[1][0], s[2][1], s[3][2], s[0][3]],
+            [s[2][0], s[3][1], s[0][2], s[1][3]],
+            [s[3][0], s[0][1], s[1][2], s[2][3]],
+        ]
+    }
 }
 
-fn inv_shift_rows(s: &Block) -> Block {
-    [
-        [s[0][0], s[3][1], s[2][2], s[1][3]],
-        [s[1][0], s[0][1], s[3][2], s[2][3]],
-        [s[2][0], s[1][1], s[0][2], s[3][3]],
-        [s[3][0], s[2][1], s[1][2], s[0][3]],
-    ]
+impl AES for AESDecrypt {
+    fn lookup_sbox(b: u8) -> u8 {
+        INV_SBOX[usize::from(b)]
+    }
+
+    fn mix_column(col: [u8; 4]) -> [u8; 4] {
+        [
+            mul(col[0], 0x0e) ^ mul(col[1], 0x0b) ^ mul(col[2], 0x0d) ^ mul(col[3], 0x09),
+            mul(col[1], 0x0e) ^ mul(col[2], 0x0b) ^ mul(col[3], 0x0d) ^ mul(col[0], 0x09),
+            mul(col[2], 0x0e) ^ mul(col[3], 0x0b) ^ mul(col[0], 0x0d) ^ mul(col[1], 0x09),
+            mul(col[3], 0x0e) ^ mul(col[0], 0x0b) ^ mul(col[1], 0x0d) ^ mul(col[2], 0x09),
+        ]
+    }
+
+    fn shift_rows(s: &Block) -> Block {
+        [
+            [s[0][0], s[3][1], s[2][2], s[1][3]],
+            [s[1][0], s[0][1], s[3][2], s[2][3]],
+            [s[2][0], s[1][1], s[0][2], s[3][3]],
+            [s[3][0], s[2][1], s[1][2], s[0][3]],
+        ]
+    }
 }
 
-fn mix_column(col: [u8; 4]) -> [u8; 4] {
-    [
-        mul(col[0], 2) ^ mul(col[1], 3) ^ col[2] ^ col[3],
-        mul(col[1], 2) ^ mul(col[2], 3) ^ col[3] ^ col[0],
-        mul(col[2], 2) ^ mul(col[3], 3) ^ col[0] ^ col[1],
-        mul(col[3], 2) ^ mul(col[0], 3) ^ col[1] ^ col[2],
-    ]
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn inv_mix_column(col: [u8; 4]) -> [u8; 4] {
-    [
-        mul(col[0], 0x0e) ^ mul(col[1], 0x0b) ^ mul(col[2], 0x0d) ^ mul(col[3], 0x09),
-        mul(col[1], 0x0e) ^ mul(col[2], 0x0b) ^ mul(col[3], 0x0d) ^ mul(col[0], 0x09),
-        mul(col[2], 0x0e) ^ mul(col[3], 0x0b) ^ mul(col[0], 0x0d) ^ mul(col[1], 0x09),
-        mul(col[3], 0x0e) ^ mul(col[0], 0x0b) ^ mul(col[1], 0x0d) ^ mul(col[2], 0x09),
-    ]
-}
-
-fn mix_columns(s: &Block) -> Block {
-    [
-        mix_column(s[0]),
-        mix_column(s[1]),
-        mix_column(s[2]),
-        mix_column(s[3]),
-    ]
-}
-
-// TODO(indutny): use templates
-fn inv_mix_columns(s: &Block) -> Block {
-    [
-        inv_mix_column(s[0]),
-        inv_mix_column(s[1]),
-        inv_mix_column(s[2]),
-        inv_mix_column(s[3]),
-    ]
-}
-
-fn rot_word(b: &mut [u8; 4]) {
-    *b = [b[1], b[2], b[3], b[0]];
-}
-
-fn key_expansion(key: &[u8]) -> Vec<u8> {
-    let mut res: Vec<u8> = Vec::with_capacity(1);
-
-    res
+    #[test]
+    fn it_should_expand_128bit_key() {
+        assert_eq!(
+            expand_key(
+                &[
+                    0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09,
+                    0xcf, 0x4f, 0x3c
+                ],
+                10
+            ),
+            vec![
+                0x2b7e_1516,
+                0x28ae_d2a6,
+                0xabf7_1588,
+                0x09cf_4f3c,
+                0xa0fa_fe17,
+                0x8854_2cb1,
+                0x23a3_3939,
+                0x2a6c_7605,
+                0xf2c2_95f2,
+                0x7a96_b943,
+                0x5935_807a,
+                0x7359_f67f,
+                0x3d80_477d,
+                0x4716_fe3e,
+                0x1e23_7e44,
+                0x6d7a_883b,
+                0xef44_a541,
+                0xa852_5b7f,
+                0xb671_253b,
+                0xdb0b_ad00,
+                0xd4d1_c6f8,
+                0x7c83_9d87,
+                0xcaf2_b8bc,
+                0x11f9_15bc,
+                0x6d88_a37a,
+                0x110b_3efd,
+                0xdbf9_8641,
+                0xca00_93fd,
+                0x4e54_f70e,
+                0x5f5f_c9f3,
+                0x84a6_4fb2,
+                0x4ea6_dc4f,
+                0xead2_7321,
+                0xb58d_bad2,
+                0x312b_f560,
+                0x7f8d_292f,
+                0xac77_66f3,
+                0x19fa_dc21,
+                0x28d1_2941,
+                0x575c_006e,
+                0xd014_f9a8,
+                0xc9ee_2589,
+                0xe13f_0cc8,
+                0xb663_0ca6,
+            ],
+        );
+    }
 }
