@@ -21,6 +21,7 @@
 #[macro_use]
 mod common;
 
+pub mod aes;
 pub mod hmac;
 pub mod pbkdf2;
 pub mod salsa20;
