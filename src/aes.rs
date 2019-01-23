@@ -311,4 +311,71 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn it_should_expand_192bit_key() {
+        assert_eq!(
+            expand_key(
+                &[
+                    0x8e, 0x73, 0xb0, 0xf7, 0xda, 0x0e, 0x64, 0x52, 0xc8, 0x10, 0xf3, 0x2b, 0x80,
+                    0x90, 0x79, 0xe5, 0x62, 0xf8, 0xea, 0xd2, 0x52, 0x2c, 0x6b, 0x7b,
+                ],
+                12
+            ),
+            vec![
+                0x8e73_b0f7,
+                0xda0e_6452,
+                0xc810_f32b,
+                0x8090_79e5,
+                0x62f8_ead2,
+                0x522c_6b7b,
+                0xfe0c_91f7,
+                0x2402_f5a5,
+                0xec12_068e,
+                0x6c82_7f6b,
+                0x0e7a_95b9,
+                0x5c56_fec2,
+                0x4db7_b4bd,
+                0x69b5_4118,
+                0x85a7_4796,
+                0xe925_38fd,
+                0xe75f_ad44,
+                0xbb09_5386,
+                0x485a_f057,
+                0x21ef_b14f,
+                0xa448_f6d9,
+                0x4d6d_ce24,
+                0xaa32_6360,
+                0x113b_30e6,
+                0xa25e_7ed5,
+                0x83b1_cf9a,
+                0x27f9_3943,
+                0x6a94_f767,
+                0xc0a6_9407,
+                0xd19d_a4e1,
+                0xec17_86eb,
+                0x6fa6_4971,
+                0x485f_7032,
+                0x22cb_8755,
+                0xe26d_1352,
+                0x33f0_b7b3,
+                0x40be_eb28,
+                0x2f18_a259,
+                0x6747_d26b,
+                0x458c_553e,
+                0xa7e1_466c,
+                0x9411_f1df,
+                0x821f_750a,
+                0xad07_d753,
+                0xca40_0538,
+                0x8fcc_5006,
+                0x282d_166a,
+                0xbc3c_e7b5,
+                0xe98b_a06f,
+                0x448c_773c,
+                0x8ecc_7204,
+                0x0100_2202,
+            ],
+        );
+    }
 }
