@@ -20,6 +20,7 @@
 
 #[macro_use]
 mod common;
+mod pkcs7;
 
 pub mod aes;
 pub mod hmac;
