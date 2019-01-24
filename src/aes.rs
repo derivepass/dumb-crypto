@@ -656,7 +656,7 @@ mod tests {
     }
 
     #[test]
-    fn it_should_encrypt_test_vector() {
+    fn it_should_encrypt_first_test_from_the_spec() {
         let mut aes = AES::new();
         let key: [u8; 16] = [
             0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
@@ -677,6 +677,73 @@ mod tests {
                 0x39, 0x25, 0x84, 0x1d, 0x02, 0xdc, 0x09, 0xfb, 0xdc, 0x11, 0x85, 0x97, 0x19, 0x6a,
                 0x0b, 0x32,
             ]
+        );
+    }
+
+    fn hex_to_vec(hex: &str) -> Vec<u8> {
+        let mut iter = hex.as_bytes().iter().map(|letter| match letter {
+            b'0'...b'9' => letter - b'0',
+            b'a'...b'f' => letter - b'a' + 10,
+            b'A'...b'F' => letter - b'A' + 10,
+            _ => panic!(),
+        });
+
+        let mut result: Vec<u8> = Vec::with_capacity(hex.len() / 2);
+        while let (Some(h), Some(l)) = (iter.next(), iter.next()) {
+            result.push((h << 4) | l);
+        }
+        result
+    }
+
+    fn hex_to_block(hex: &str) -> [u8; 16] {
+        let vec = hex_to_vec(hex);
+        let mut b = [0; 16];
+
+        for (i, elem) in vec.into_iter().enumerate() {
+            b[i] = elem;
+        }
+
+        b
+    }
+
+    fn check_cipher_vector(key: &str, input: &str, output: &str) {
+        let mut aes = AES::new();
+        aes.init(&hex_to_vec(key)).unwrap();
+
+        assert_eq!(
+            aes.encrypt(&hex_to_block(input)).unwrap(),
+            hex_to_block(output)
+        );
+        assert_eq!(
+            aes.decrypt(&hex_to_block(output)).unwrap(),
+            hex_to_block(input)
+        );
+    }
+
+    #[test]
+    fn it_should_encrypt_test_vector_0() {
+        check_cipher_vector(
+            "000102030405060708090a0b0c0d0e0f",
+            "00112233445566778899aabbccddeeff",
+            "69c4e0d86a7b0430d8cdb78070b4c55a",
+        );
+    }
+
+    #[test]
+    fn it_should_encrypt_test_vector_1() {
+        check_cipher_vector(
+            "000102030405060708090a0b0c0d0e0f1011121314151617",
+            "00112233445566778899aabbccddeeff",
+            "dda97ca4864cdfe06eaf70a0ec0d7191",
+        );
+    }
+
+    #[test]
+    fn it_should_encrypt_test_vector_2() {
+        check_cipher_vector(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00112233445566778899aabbccddeeff",
+            "8ea2b7ca516745bfeafc49904b496089",
         );
     }
 }
