@@ -6,7 +6,12 @@
 //! [fips]: https://csrc.nist.gov/csrc/media/publications/fips/197/final/documents/fips-197.pdf
 //!
 
+use std::error::Error;
+use std::fmt;
+use std::fmt::Display;
+
 pub const BLOCK_SIZE: usize = 16;
+const NB: usize = 4;
 
 // Note: block[column][row]
 type Block = [[u8; 4]; 4];
@@ -105,30 +110,12 @@ fn rot_word(b: u32) -> u32 {
     (b << 8) | (b >> 24)
 }
 
-// TODO(indutny): proper errors
-fn compute_round_count(key: &[u8]) -> Result<usize, ()> {
-    match key.len() {
-        // 128 bits
-        16 => Ok(10),
-
-        // 192 bits
-        24 => Ok(12),
-
-        // 256 bits
-        32 => Ok(14),
-
-        _ => Err(()),
-    }
-}
-
 fn expand_key(key: &[u8], round_count: usize) -> Vec<u32> {
-    let nb = BLOCK_SIZE / 4;
-
     // byte key[4*Nk]
     let nk = key.len() / 4;
 
     // word w[Nb*(Nr+1)]
-    let mut w = Vec::with_capacity(nb * (round_count + 1));
+    let mut w = Vec::with_capacity(NB * (round_count + 1));
 
     //  word  temp
     //  i = 0
@@ -159,7 +146,7 @@ fn expand_key(key: &[u8], round_count: usize) -> Vec<u32> {
     //      w[i] = w[i-Nk] xor temp
     //      i = i + 1
     //  end while
-    while i < nb * (round_count + 1) {
+    while i < NB * (round_count + 1) {
         let mut temp = w[i - 1];
         if i % nk == 0 {
             temp = sub_word(rot_word(temp)) ^ RCON[i / nk - 1];
@@ -173,12 +160,21 @@ fn expand_key(key: &[u8], round_count: usize) -> Vec<u32> {
     w
 }
 
-trait AES {
+trait AESSide {
     fn lookup_sbox(b: u8) -> u8;
     fn mix_column(col: [u8; 4]) -> [u8; 4];
     fn shift_rows(s: &Block) -> Block;
 
     // Common methods
+
+    fn add_round_key(s: &mut Block, round_key: &[u32]) {
+        for (col, &key) in s.iter_mut().zip(round_key) {
+            col[0] ^= (key >> 24) as u8;
+            col[1] ^= ((key >> 16) & 0xff) as u8;
+            col[2] ^= ((key >> 8) & 0xff) as u8;
+            col[3] ^= (key & 0xff) as u8;
+        }
+    }
 
     fn sub_bytes(s: &mut Block) {
         for col in s.iter_mut() {
@@ -188,20 +184,17 @@ trait AES {
         }
     }
 
-    fn mix_columns(s: &Block) -> Block {
-        [
-            Self::mix_column(s[0]),
-            Self::mix_column(s[1]),
-            Self::mix_column(s[2]),
-            Self::mix_column(s[3]),
-        ]
+    fn mix_columns(s: &mut Block) {
+        for column in s.iter_mut() {
+            *column = Self::mix_column(*column);
+        }
     }
 }
 
 struct AESEncrypt {}
 struct AESDecrypt {}
 
-impl AES for AESEncrypt {
+impl AESSide for AESEncrypt {
     fn lookup_sbox(b: u8) -> u8 {
         SBOX[usize::from(b)]
     }
@@ -225,7 +218,7 @@ impl AES for AESEncrypt {
     }
 }
 
-impl AES for AESDecrypt {
+impl AESSide for AESDecrypt {
     fn lookup_sbox(b: u8) -> u8 {
         INV_SBOX[usize::from(b)]
     }
@@ -246,6 +239,168 @@ impl AES for AESDecrypt {
             [s[2][0], s[1][1], s[0][2], s[3][3]],
             [s[3][0], s[2][1], s[1][2], s[0][3]],
         ]
+    }
+}
+
+fn to_block(b: &[u8; BLOCK_SIZE]) -> Block {
+    [
+        [b[0], b[1], b[2], b[3]],
+        [b[4], b[5], b[6], b[7]],
+        [b[8], b[9], b[10], b[11]],
+        [b[12], b[13], b[14], b[15]],
+    ]
+}
+
+fn from_block(s: &Block) -> [u8; BLOCK_SIZE] {
+    [
+        s[0][0], s[0][1], s[0][2], s[0][3], s[1][0], s[1][1], s[1][2], s[1][3], s[2][0], s[2][1],
+        s[2][2], s[2][3], s[3][0], s[3][1], s[3][2], s[3][3],
+    ]
+}
+
+/// Possible initialization errors
+#[derive(Debug, PartialEq)]
+pub enum AESError {
+    /// Returned when key size is neither of: 128, 192, or 256 bits.
+    InvalidKeySize,
+
+    /// Returned when attempting encryption/decryption on non-initialized AES
+    /// instance
+    NotInitialized,
+}
+
+impl Display for AESError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AESError: {}", self.description())
+    }
+}
+
+impl Error for AESError {
+    fn description(self: &Self) -> &str {
+        match self {
+            AESError::InvalidKeySize => "key size must be either of: 128, 192, or 256 bits",
+            AESError::NotInitialized => "AES instance must be initialized prior to use",
+        }
+    }
+}
+
+///
+/// Main AES structure.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::aes::{AES, BLOCK_SIZE};
+///
+/// let mut aes = AES::new();
+/// let key: [u8; 16] = [
+///    0x2b, 0x7e, 0x15, 0x16,
+///    0x28, 0xae, 0xd2, 0xa6,
+///    0xab, 0xf7, 0x15, 0x88,
+///    0x09, 0xcf, 0x4f, 0x3c,
+/// ];
+/// aes.init(&key).unwrap();
+///
+/// let cleartext: [u8; BLOCK_SIZE] = [23; BLOCK_SIZE];
+///
+/// let ciphertext = aes.encrypt(&cleartext).unwrap();
+///
+/// assert_eq!(aes.decrypt(&ciphertext).unwrap(), cleartext);
+/// ```
+///
+pub struct AES {
+    round_count: usize,
+    round_keys: Option<Vec<u32>>,
+}
+
+impl AES {
+    pub fn new() -> Self {
+        AES {
+            round_count: 0,
+            round_keys: None,
+        }
+    }
+
+    pub fn init(self: &mut Self, key: &[u8]) -> Result<(), AESError> {
+        self.round_count = match key.len() {
+            // 128 bits
+            16 => 10,
+
+            // 192 bits
+            24 => 12,
+
+            // 256 bits
+            32 => 14,
+
+            // Invalid key size
+            _ => {
+                return Err(AESError::InvalidKeySize);
+            }
+        };
+        self.round_keys = Some(expand_key(key, self.round_count));
+
+        Ok(())
+    }
+
+    pub fn encrypt(self: &Self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
+        let nr = self.round_count;
+
+        let mut state = to_block(b);
+        let round_keys = match &self.round_keys {
+            Some(keys) => keys,
+            None => {
+                return Err(AESError::NotInitialized);
+            }
+        };
+
+        AESEncrypt::add_round_key(&mut state, &round_keys[0..NB]);
+
+        for round in 1..nr {
+            AESEncrypt::sub_bytes(&mut state);
+            state = AESEncrypt::shift_rows(&state);
+            AESEncrypt::mix_columns(&mut state);
+            AESEncrypt::add_round_key(&mut state, &round_keys[(round * NB)..((round + 1) * NB)]);
+        }
+
+        AESEncrypt::sub_bytes(&mut state);
+        state = AESEncrypt::shift_rows(&state);
+        AESEncrypt::add_round_key(&mut state, &round_keys[(nr * NB)..]);
+
+        Ok(from_block(&state))
+    }
+
+    pub fn decrypt(self: &Self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
+        let nr = self.round_count;
+
+        let mut state = to_block(b);
+        let round_keys = match &self.round_keys {
+            Some(keys) => keys,
+            None => {
+                return Err(AESError::NotInitialized);
+            }
+        };
+
+        AESDecrypt::add_round_key(&mut state, &round_keys[(nr * NB)..]);
+
+        for round in (1..nr).rev() {
+            state = AESDecrypt::shift_rows(&state);
+            AESDecrypt::sub_bytes(&mut state);
+            AESDecrypt::add_round_key(&mut state, &round_keys[(round * NB)..((round + 1) * NB)]);
+            AESDecrypt::mix_columns(&mut state);
+        }
+
+        state = AESDecrypt::shift_rows(&state);
+        AESDecrypt::sub_bytes(&mut state);
+        AESDecrypt::add_round_key(&mut state, &round_keys[0..NB]);
+
+        Ok(from_block(&state))
+    }
+}
+
+impl Default for AES {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

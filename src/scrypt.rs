@@ -34,7 +34,7 @@ impl Display for ScryptError {
 }
 
 impl Error for ScryptError {
-    fn description(self: &ScryptError) -> &str {
+    fn description(self: &Self) -> &str {
         match self {
             ScryptError::RIsTooSmall => "`r` must be larger than 1",
             ScryptError::NIsTooSmall => "`n` must be larger than 1",
