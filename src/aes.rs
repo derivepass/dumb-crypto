@@ -80,16 +80,15 @@ fn double(b: u8) -> u8 {
 }
 
 // Multiply the number by another number in the binary field.
-fn mul(b: u8, mut by: u8) -> u8 {
+fn mul(b: u8, mut by: usize) -> u8 {
     let mut res: u8 = 0;
+    let mut power = b;
     while by != 0 {
-        let bit = by & 2;
-        by >>= 1;
-
-        res = double(res);
-        if bit != 0 {
-            res ^= b;
+        if (by & 1) != 0 {
+            res ^= power;
         }
+        power = double(power);
+        by >>= 1;
     }
     res
 }
@@ -295,14 +294,15 @@ impl Error for AESError {
 ///
 /// let mut aes = AES::new();
 /// let key: [u8; 16] = [
-///    0x2b, 0x7e, 0x15, 0x16,
-///    0x28, 0xae, 0xd2, 0xa6,
-///    0xab, 0xf7, 0x15, 0x88,
-///    0x09, 0xcf, 0x4f, 0x3c,
+///     0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+///     0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c,
 /// ];
 /// aes.init(&key).unwrap();
 ///
-/// let cleartext: [u8; BLOCK_SIZE] = [23; BLOCK_SIZE];
+/// let cleartext: [u8; BLOCK_SIZE] = [
+///     0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d,
+///     0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34,
+/// ];
 ///
 /// let ciphertext = aes.encrypt(&cleartext).unwrap();
 ///
@@ -407,6 +407,18 @@ impl Default for AES {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn it_should_multiply_in_field() {
+        assert_eq!(mul(1, 2), 2);
+        assert_eq!(mul(1, 3), 3);
+
+        assert_eq!(mul(0x57, 0x02), 0xae);
+        assert_eq!(mul(0x57, 0x04), 0x47);
+        assert_eq!(mul(0x57, 0x08), 0x8e);
+        assert_eq!(mul(0x57, 0x10), 0x07);
+        assert_eq!(mul(0x57, 0x13), 0xfe);
+    }
 
     #[test]
     fn it_should_expand_128bit_key() {
@@ -607,6 +619,31 @@ mod tests {
                 0x046d_f344,
                 0x706c_631e,
             ],
+        );
+    }
+
+    #[test]
+    fn it_should_encrypt_test_vector() {
+        let mut aes = AES::new();
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+        aes.init(&key).unwrap();
+
+        let cleartext: [u8; BLOCK_SIZE] = [
+            0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37,
+            0x07, 0x34,
+        ];
+
+        let ciphertext = aes.encrypt(&cleartext).unwrap();
+
+        assert_eq!(
+            ciphertext,
+            [
+                0x39, 0x25, 0x84, 0x1d, 0x02, 0xdc, 0x09, 0xfb, 0xdc, 0x11, 0x85, 0x97, 0x19, 0x6a,
+                0x0b, 0x32,
+            ]
         );
     }
 }
