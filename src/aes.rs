@@ -275,7 +275,7 @@ impl Display for AESError {
 }
 
 impl Error for AESError {
-    fn description(self: &Self) -> &str {
+    fn description(&self) -> &str {
         match self {
             AESError::InvalidKeySize => "key size must be either of: 128, 192, or 256 bits",
             AESError::NotInitialized => "AES instance must be initialized prior to use",
@@ -324,7 +324,7 @@ impl AES {
     }
 
     /// Initialize an instance with a encryption/decryption key.
-    pub fn init(self: &mut Self, key: &[u8]) -> Result<(), AESError> {
+    pub fn init(&mut self, key: &[u8]) -> Result<(), AESError> {
         self.round_count = match key.len() {
             // 128 bits
             16 => 10,
@@ -346,7 +346,7 @@ impl AES {
     }
 
     /// Encrypt block of data.
-    pub fn encrypt(self: &Self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
+    pub fn encrypt(&self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
         let nr = self.round_count;
 
         let mut state = to_block(b);
@@ -374,7 +374,7 @@ impl AES {
     }
 
     /// Decrypt block of data.
-    pub fn decrypt(self: &Self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
+    pub fn decrypt(&self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
         let nr = self.round_count;
 
         let mut state = to_block(b);
