@@ -662,14 +662,14 @@ mod tests {
             0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
             0x4f, 0x3c,
         ];
-        aes.init(&key).unwrap();
+        aes.init(&key).expect("init to not fail");
 
         let cleartext: [u8; BLOCK_SIZE] = [
             0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37,
             0x07, 0x34,
         ];
 
-        let ciphertext = aes.encrypt(&cleartext).unwrap();
+        let ciphertext = aes.encrypt(&cleartext).expect("encrypt to not fail");
 
         assert_eq!(
             ciphertext,
@@ -708,14 +708,16 @@ mod tests {
 
     fn check_cipher_vector(key: &str, input: &str, output: &str) {
         let mut aes = AES::new();
-        aes.init(&hex_to_vec(key)).unwrap();
+        aes.init(&hex_to_vec(key)).expect("init to not fail");
 
         assert_eq!(
-            aes.encrypt(&hex_to_block(input)).unwrap(),
+            aes.encrypt(&hex_to_block(input))
+                .expect("encrypt to not fail"),
             hex_to_block(output)
         );
         assert_eq!(
-            aes.decrypt(&hex_to_block(output)).unwrap(),
+            aes.decrypt(&hex_to_block(output))
+                .expect("decrypt to not fail"),
             hex_to_block(input)
         );
     }

@@ -402,7 +402,8 @@ mod tests {
         let s = Scrypt::new(1, 16, 1);
 
         let mut out: [u8; 64] = [0; 64];
-        s.derive(b"", b"", &mut out).unwrap();
+        s.derive(b"", b"", &mut out)
+            .expect("derivation to not fail");
         assert_eq!(
             out.to_vec(),
             vec![
@@ -420,7 +421,8 @@ mod tests {
         let s = Scrypt::new(8, 1024, 16);
 
         let mut out: [u8; 64] = [0; 64];
-        s.derive(b"password", b"NaCl", &mut out).unwrap();
+        s.derive(b"password", b"NaCl", &mut out)
+            .expect("derivation to not fail");
         assert_eq!(
             out.to_vec(),
             vec![
@@ -439,7 +441,7 @@ mod tests {
 
         let mut out: [u8; 64] = [0; 64];
         s.derive(b"pleaseletmein", b"SodiumChloride", &mut out)
-            .unwrap();
+            .expect("derivation to not fail");
         assert_eq!(
             out.to_vec(),
             vec![
@@ -458,7 +460,7 @@ mod tests {
 
         let mut out: [u8; 64] = [0; 64];
         s.derive(b"pleaseletmein", b"SodiumChloride", &mut out)
-            .unwrap();
+            .expect("derivation to not fail");
         assert_eq!(
             out.to_vec(),
             vec![
