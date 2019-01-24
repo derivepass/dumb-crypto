@@ -421,6 +421,31 @@ mod tests {
     }
 
     #[test]
+    fn it_should_inverse_sub_bytes() {
+        let source: Block = [[23; 4]; 4];
+        let mut s: Block = source;
+        AESEncrypt::sub_bytes(&mut s);
+        AESDecrypt::sub_bytes(&mut s);
+        assert_eq!(s, source);
+    }
+
+    #[test]
+    fn it_should_inverse_mix_columns() {
+        let source: Block = [[23; 4]; 4];
+        let mut s: Block = source;
+        AESEncrypt::mix_columns(&mut s);
+        AESDecrypt::mix_columns(&mut s);
+        assert_eq!(s, source);
+    }
+
+    #[test]
+    fn it_should_inverse_shift_rows() {
+        let source: Block = [[23; 4]; 4];
+        let t = AESEncrypt::shift_rows(&source);
+        assert_eq!(AESDecrypt::shift_rows(&t), source);
+    }
+
+    #[test]
     fn it_should_expand_128bit_key() {
         assert_eq!(
             expand_key(
