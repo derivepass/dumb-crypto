@@ -315,6 +315,7 @@ pub struct AES {
 }
 
 impl AES {
+    /// Create new uninitialized instance of AES.
     pub fn new() -> Self {
         AES {
             round_count: 0,
@@ -322,6 +323,7 @@ impl AES {
         }
     }
 
+    /// Initialize an instance with a encryption/decryption key.
     pub fn init(self: &mut Self, key: &[u8]) -> Result<(), AESError> {
         self.round_count = match key.len() {
             // 128 bits
@@ -343,6 +345,7 @@ impl AES {
         Ok(())
     }
 
+    /// Encrypt block of data.
     pub fn encrypt(self: &Self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
         let nr = self.round_count;
 
@@ -370,6 +373,7 @@ impl AES {
         Ok(from_block(&state))
     }
 
+    /// Decrypt block of data.
     pub fn decrypt(self: &Self, b: &[u8; BLOCK_SIZE]) -> Result<[u8; BLOCK_SIZE], AESError> {
         let nr = self.round_count;
 
@@ -408,6 +412,13 @@ impl Default for AES {
 mod tests {
     use super::*;
 
+    const TEST_BLOCK: Block = [
+        [0x37, 0xd7, 0xa0, 0x2d],
+        [0x8a, 0x65, 0xc1, 0x96],
+        [0xda, 0xee, 0x01, 0x99],
+        [0xb9, 0x9e, 0x55, 0x65],
+    ];
+
     #[test]
     fn it_should_multiply_in_field() {
         assert_eq!(mul(1, 2), 2);
@@ -422,27 +433,24 @@ mod tests {
 
     #[test]
     fn it_should_inverse_sub_bytes() {
-        let source: Block = [[23; 4]; 4];
-        let mut s: Block = source;
+        let mut s: Block = TEST_BLOCK;
         AESEncrypt::sub_bytes(&mut s);
         AESDecrypt::sub_bytes(&mut s);
-        assert_eq!(s, source);
+        assert_eq!(s, TEST_BLOCK);
     }
 
     #[test]
     fn it_should_inverse_mix_columns() {
-        let source: Block = [[23; 4]; 4];
-        let mut s: Block = source;
+        let mut s: Block = TEST_BLOCK;
         AESEncrypt::mix_columns(&mut s);
         AESDecrypt::mix_columns(&mut s);
-        assert_eq!(s, source);
+        assert_eq!(s, TEST_BLOCK);
     }
 
     #[test]
     fn it_should_inverse_shift_rows() {
-        let source: Block = [[23; 4]; 4];
-        let t = AESEncrypt::shift_rows(&source);
-        assert_eq!(AESDecrypt::shift_rows(&t), source);
+        let t = AESEncrypt::shift_rows(&TEST_BLOCK);
+        assert_eq!(AESDecrypt::shift_rows(&t), TEST_BLOCK);
     }
 
     #[test]
