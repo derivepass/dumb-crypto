@@ -1,3 +1,8 @@
+//! # AES-CBC
+//!
+//! Implementation of CBC-mode AES cipher/decipher.
+//!
+
 use crate::aes::{AESError, AES, BLOCK_SIZE};
 use crate::pkcs7;
 
@@ -5,6 +10,31 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Display;
 
+///
+/// Main AES-CBC Cipher structure.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::aes::BLOCK_SIZE;
+/// use::dumb_crypto::aes_cbc::Cipher;
+///
+/// let iv = [
+///     0x4c, 0xb4, 0x52, 0xd6, 0x78, 0xca, 0x94, 0x61,
+///     0x92, 0xcd, 0xc6, 0x91, 0xb7, 0xab, 0x61, 0x76,
+/// ];
+/// let key: [u8; 16] = [
+///     0x69, 0xc2, 0xa9, 0xe6, 0x2b, 0x61, 0x30, 0x60,
+///     0xc9, 0x79, 0x7b, 0xdc, 0xe4, 0xf6, 0x40, 0x8e,
+/// ];
+/// let mut cipher = Cipher::new(iv);
+/// cipher.init(&key).unwrap();
+///
+/// let mut ciphertext = cipher.write("aes-cbc with iv".as_bytes()).unwrap();
+/// ciphertext.append(&mut cipher.flush().unwrap());
+/// ```
+///
 pub struct Cipher {
     aes: AES,
     pad: pkcs7::Pad,
@@ -12,6 +42,9 @@ pub struct Cipher {
 }
 
 impl Cipher {
+    /// Create new instance of AES-CBC Cipher
+    ///
+    /// `iv` - Initialization Vector (this better be a very random value)
     pub fn new(iv: [u8; BLOCK_SIZE]) -> Self {
         Cipher {
             aes: AES::new(),
@@ -20,11 +53,15 @@ impl Cipher {
         }
     }
 
+    /// Initialize instance of AES-CBC Cipher
+    ///
+    /// `key` - AES Key. Must be either 128, 192, or 256 bits.
     pub fn init(&mut self, key: &[u8]) -> Result<(), AESError> {
         self.aes.init(key)?;
         Ok(())
     }
 
+    /// Encrypt data
     pub fn write(&mut self, b: &[u8]) -> Result<Vec<u8>, AESError> {
         let blocks = match self.pad.write(b) {
             None => {
@@ -41,6 +78,7 @@ impl Cipher {
         Ok(result)
     }
 
+    /// Encrypt and return final cipher block
     pub fn flush(&mut self) -> Result<Vec<u8>, AESError> {
         let block = self.pad.flush();
         Ok(self.encrypt_block(&block)?)
@@ -64,6 +102,34 @@ impl Cipher {
     }
 }
 
+///
+/// Main AES-CBC Decipher structure.
+///
+/// Usage:
+/// ```rust
+/// extern crate dumb_crypto;
+///
+/// use::dumb_crypto::aes::BLOCK_SIZE;
+/// use::dumb_crypto::aes_cbc::Decipher;
+///
+/// let iv = [
+///     0x4c, 0xb4, 0x52, 0xd6, 0x78, 0xca, 0x94, 0x61,
+///     0x92, 0xcd, 0xc6, 0x91, 0xb7, 0xab, 0x61, 0x76,
+/// ];
+/// let key: [u8; 16] = [
+///     0x69, 0xc2, 0xa9, 0xe6, 0x2b, 0x61, 0x30, 0x60,
+///     0xc9, 0x79, 0x7b, 0xdc, 0xe4, 0xf6, 0x40, 0x8e,
+/// ];
+/// let mut decipher = Decipher::new(iv);
+/// decipher.init(&key).unwrap();
+///
+/// let mut cleartext = decipher.write(&[
+///     0x98, 0xba, 0x8e, 0x07, 0x5b, 0xcf, 0xa7, 0xb9,
+///     0x3a, 0xbe, 0x45, 0x3a, 0xb1, 0x84, 0xdc, 0x68,
+/// ]).unwrap();
+/// cleartext.append(&mut decipher.flush().unwrap());
+/// ```
+///
 pub struct Decipher {
     aes: AES,
     unpad: pkcs7::Unpad,
@@ -71,9 +137,12 @@ pub struct Decipher {
     buffer: pkcs7::Pad,
 }
 
+/// Possible decipher errors
 #[derive(Debug, PartialEq)]
 pub enum DecipherError {
+    /// Returned on AES-specific errors
     AES(AESError),
+    /// Returned on PKCS7-specific padding errors
     PKCS7(pkcs7::UnpadError),
 }
 
@@ -94,6 +163,9 @@ impl Error for DecipherError {
 }
 
 impl Decipher {
+    /// Create new instance of AES-CBC Decipher
+    ///
+    /// `iv` - Initialization Vector (this better be a very random value)
     pub fn new(iv: [u8; BLOCK_SIZE]) -> Self {
         Decipher {
             aes: AES::new(),
@@ -103,11 +175,15 @@ impl Decipher {
         }
     }
 
+    /// Initialize instance of AES-CBC Decipher
+    ///
+    /// `key` - AES Key. Must be either 128, 192, or 256 bits.
     pub fn init(&mut self, key: &[u8]) -> Result<(), AESError> {
         self.aes.init(key)?;
         Ok(())
     }
 
+    /// Decrypt data
     pub fn write(&mut self, b: &[u8]) -> Result<Vec<u8>, DecipherError> {
         let blocks = match self.buffer.write(b) {
             Some(blocks) => blocks,
@@ -137,6 +213,7 @@ impl Decipher {
         Ok(self.unpad.write(&padded_result).unwrap_or_default())
     }
 
+    /// Decrypt and return final cleartext data
     pub fn flush(&mut self) -> Result<Vec<u8>, DecipherError> {
         match self.unpad.flush() {
             Err(err) => Err(DecipherError::PKCS7(err)),
