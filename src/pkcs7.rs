@@ -7,20 +7,20 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Display;
 
-struct Pad {
+pub struct Pad {
     block_size: usize,
     storage: Vec<u8>,
 }
 
 impl Pad {
-    fn new(block_size: usize) -> Self {
+    pub fn new(block_size: usize) -> Self {
         Pad {
             block_size,
             storage: Vec::with_capacity(2 * block_size),
         }
     }
 
-    fn write(&mut self, buf: &[u8]) -> Option<Vec<u8>> {
+    pub fn write(&mut self, buf: &[u8]) -> Option<Vec<u8>> {
         for &elem in buf {
             self.storage.push(elem);
         }
@@ -40,8 +40,8 @@ impl Pad {
         Some(head)
     }
 
-    fn flush(&mut self) -> Vec<u8> {
-        let len = self.storage.len();
+    pub fn flush(&mut self) -> Vec<u8> {
+        let len = self.block_size - self.storage.len();
         while self.storage.len() < self.block_size {
             self.storage.push(len as u8);
         }
@@ -54,7 +54,7 @@ impl Pad {
 
 /// Possible unpad errors
 #[derive(Debug, PartialEq)]
-enum UnpadError {
+pub enum UnpadError {
     /// Returned when the data length is not divisible by the block size.
     UnfinishedBlock,
 
@@ -77,20 +77,20 @@ impl Error for UnpadError {
     }
 }
 
-struct Unpad {
+pub struct Unpad {
     block_size: usize,
     storage: Vec<u8>,
 }
 
 impl Unpad {
-    fn new(block_size: usize) -> Self {
+    pub fn new(block_size: usize) -> Self {
         Unpad {
             block_size,
             storage: Vec::with_capacity(2 * block_size),
         }
     }
 
-    fn write(&mut self, buf: &[u8]) -> Option<Vec<u8>> {
+    pub fn write(&mut self, buf: &[u8]) -> Option<Vec<u8>> {
         for &elem in buf {
             self.storage.push(elem);
         }
@@ -119,16 +119,20 @@ impl Unpad {
         Some(head)
     }
 
-    fn flush(&mut self) -> Result<Vec<u8>, UnpadError> {
+    pub fn flush(&mut self) -> Result<Vec<u8>, UnpadError> {
         if self.storage.len() != self.block_size {
             return Err(UnpadError::UnfinishedBlock);
         }
 
         let len = self.storage[self.storage.len() - 1];
+        if len > (self.block_size as u8) {
+            return Err(UnpadError::InvalidPadding);
+        }
+        let pad_off: usize = self.block_size - usize::from(len);
 
         // XXX(indutny): hopefully this won't be optimized away
         let mut is_same: u8 = 0;
-        for b in self.storage[usize::from(len)..].iter() {
+        for b in self.storage[pad_off..].iter() {
             is_same |= len ^ b;
         }
 
@@ -136,7 +140,7 @@ impl Unpad {
             return Err(UnpadError::InvalidPadding);
         }
 
-        let result = self.storage[..usize::from(len)].to_vec();
+        let result = self.storage[..pad_off].to_vec();
         self.storage.clear();
         Ok(result)
     }
@@ -151,7 +155,7 @@ mod tests {
         let mut pad = Pad::new(4);
 
         assert_eq!(pad.write(b"123"), None);
-        assert_eq!(pad.flush(), b"123\x03");
+        assert_eq!(pad.flush(), b"123\x01");
     }
 
     #[test]
@@ -167,14 +171,14 @@ mod tests {
         let mut pad = Pad::new(4);
 
         assert_eq!(pad.write(b"1234"), Some(b"1234".to_vec()));
-        assert_eq!(pad.flush(), b"\x00\x00\x00\x00");
+        assert_eq!(pad.flush(), b"\x04\x04\x04\x04");
     }
 
     #[test]
     fn it_should_unpad_single_block() {
         let mut unpad = Unpad::new(4);
 
-        assert_eq!(unpad.write(b"123\x03"), None);
+        assert_eq!(unpad.write(b"123\x01"), None);
         assert_eq!(unpad.flush().expect("flush to succeed"), b"123".to_vec());
     }
 
@@ -183,7 +187,7 @@ mod tests {
         let mut unpad = Unpad::new(4);
 
         assert_eq!(unpad.write(b"1234"), None);
-        assert_eq!(unpad.write(b"5\x01\x01\x01"), Some(b"1234".to_vec()));
+        assert_eq!(unpad.write(b"5\x03\x03\x03"), Some(b"1234".to_vec()));
         assert_eq!(unpad.flush().expect("flush to succeed"), b"5".to_vec());
     }
 
@@ -192,7 +196,7 @@ mod tests {
         let mut unpad = Unpad::new(4);
 
         assert_eq!(unpad.write(b"1234"), None);
-        assert_eq!(unpad.write(b"\x00\x00\x00\x00"), Some(b"1234".to_vec()));
+        assert_eq!(unpad.write(b"\x04\x04\x04\x04"), Some(b"1234".to_vec()));
         assert_eq!(unpad.flush().expect("flush to succeed"), b"".to_vec());
     }
 

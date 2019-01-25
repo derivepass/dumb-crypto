@@ -23,6 +23,7 @@ mod common;
 mod pkcs7;
 
 pub mod aes;
+pub mod aes_cbc;
 pub mod hmac;
 pub mod pbkdf2;
 pub mod salsa20;
