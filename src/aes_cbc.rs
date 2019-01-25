@@ -25,10 +25,10 @@ impl Cipher {
         Ok(())
     }
 
-    pub fn write(&mut self, b: &[u8]) -> Result<Option<Vec<u8>>, AESError> {
+    pub fn write(&mut self, b: &[u8]) -> Result<Vec<u8>, AESError> {
         let blocks = match self.pad.write(b) {
             None => {
-                return Ok(None);
+                return Ok(vec![]);
             }
             Some(block) => block,
         };
@@ -38,7 +38,7 @@ impl Cipher {
             let mut ciphertext = self.encrypt_block(block)?;
             result.append(&mut ciphertext);
         }
-        Ok(Some(result))
+        Ok(result)
     }
 
     pub fn flush(&mut self) -> Result<Vec<u8>, AESError> {
@@ -108,11 +108,11 @@ impl Decipher {
         Ok(())
     }
 
-    pub fn write(&mut self, b: &[u8]) -> Result<Option<Vec<u8>>, DecipherError> {
+    pub fn write(&mut self, b: &[u8]) -> Result<Vec<u8>, DecipherError> {
         let blocks = match self.buffer.write(b) {
             Some(blocks) => blocks,
             None => {
-                return Ok(None);
+                return Ok(vec![]);
             }
         };
 
@@ -134,7 +134,7 @@ impl Decipher {
             padded_result.append(&mut cleartext.to_vec());
         }
 
-        Ok(self.unpad.write(&padded_result))
+        Ok(self.unpad.write(&padded_result).unwrap_or_default())
     }
 
     pub fn flush(&mut self) -> Result<Vec<u8>, DecipherError> {
@@ -160,8 +160,7 @@ mod tests {
 
         let mut actual = cipher
             .write(cleartext.as_bytes())
-            .expect("cipher write to not fail")
-            .unwrap_or_default();
+            .expect("cipher write to not fail");
         actual.append(&mut cipher.flush().expect("cipher flush to not fail"));
 
         assert_eq!(actual, hex_to_vec(ciphertext));
@@ -170,8 +169,7 @@ mod tests {
         decipher.init(&key_vec).expect("decipher init to not fail");
         let mut back = decipher
             .write(&hex_to_vec(ciphertext))
-            .expect("decipher write to not fail")
-            .unwrap_or_default();
+            .expect("decipher write to not fail");
         back.append(&mut decipher.flush().expect("decipher flush to not fail"));
 
         assert_eq!(back, cleartext.as_bytes());
