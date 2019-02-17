@@ -290,7 +290,7 @@ impl Error for AESError {
 /// ```rust
 /// extern crate dumb_crypto;
 ///
-/// use::dumb_crypto::aes::{AES, BLOCK_SIZE};
+/// use dumb_crypto::aes::{AES, BLOCK_SIZE};
 ///
 /// let mut aes = AES::new();
 /// let key: [u8; 16] = [

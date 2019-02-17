@@ -153,7 +153,7 @@ fn write_u64_be(data: &mut [u8], value: u64) {
 /// ```rust
 /// extern crate dumb_crypto;
 ///
-/// use::dumb_crypto::sha256::SHA256;
+/// use dumb_crypto::sha256::SHA256;
 ///
 /// let mut sha256 = SHA256::new();
 ///

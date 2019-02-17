@@ -147,7 +147,7 @@ fn littleendian_inv(x: u32, y: &mut [u8]) {
 /// ```rust
 /// extern crate dumb_crypto;
 ///
-/// use::dumb_crypto::salsa20::salsa20;
+/// use dumb_crypto::salsa20::salsa20;
 ///
 /// let mut out: [u8; 64] = [0; 64];
 ///

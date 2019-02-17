@@ -15,7 +15,7 @@ use crate::sha256::{BLOCK_SIZE, DIGEST_SIZE, SHA256};
 /// ```rust
 /// extern crate dumb_crypto;
 ///
-/// use::dumb_crypto::hmac::HMac;
+/// use dumb_crypto::hmac::HMac;
 ///
 /// let mut hmac = HMac::new(b"secret key");
 ///

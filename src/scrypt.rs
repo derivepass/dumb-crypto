@@ -51,7 +51,7 @@ impl Error for ScryptError {
 /// ```rust
 /// extern crate dumb_crypto;
 ///
-/// use::dumb_crypto::scrypt::Scrypt;
+/// use dumb_crypto::scrypt::Scrypt;
 ///
 /// let scrypt = Scrypt::new(1, 128, 1);
 ///

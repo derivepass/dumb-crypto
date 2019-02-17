@@ -17,8 +17,8 @@ use std::fmt::Display;
 /// ```rust
 /// extern crate dumb_crypto;
 ///
-/// use::dumb_crypto::aes::BLOCK_SIZE;
-/// use::dumb_crypto::aes_cbc::Cipher;
+/// use dumb_crypto::aes::BLOCK_SIZE;
+/// use dumb_crypto::aes_cbc::Cipher;
 ///
 /// let iv = [
 ///     0x4c, 0xb4, 0x52, 0xd6, 0x78, 0xca, 0x94, 0x61,

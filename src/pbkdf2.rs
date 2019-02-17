@@ -18,7 +18,7 @@ use crate::sha256::DIGEST_SIZE;
 /// ```rust
 /// extern crate dumb_crypto;
 ///
-/// use::dumb_crypto::pbkdf2::pbkdf2_sha256;
+/// use dumb_crypto::pbkdf2::pbkdf2_sha256;
 ///
 /// let mut out: [u8; 8] = [0; 8];
 ///
